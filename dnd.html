@@ -581,7 +581,6 @@
                         if (this.decorations[i]) {
                             let row = Math.floor(i/grid_dimension)+1;
                             let col = i%grid_dimension+1;
-                            console.log(row+' '+col);
                             $('#r'+row+'c'+col).css('background-color', '');
                             this.decorations[i] = null;
                         }
