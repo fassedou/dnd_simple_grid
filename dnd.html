@@ -904,13 +904,13 @@
                 }
 
                 _delete_saved_character(id, list) {
-                    for (let i = 0; i<tlist.length; i++) {
+                    for (let i = 0; i<list.length; i++) {
                         let saved_character = list[i];
                         if (saved_character.id == id) {
                             list.splice(i, 1);
-                            grid_case = this._creator_parameters.case;
-                            row = this._creator_parameters.row;
-                            col = this._creator_parameters.col;
+                            let grid_case = this._creator_parameters.case;
+                            let row = this._creator_parameters.row;
+                            let col = this._creator_parameters.col;
                             this.cancel();
                             return grid_manager.onclick_case_handler(grid_case, row, col);
                         }
@@ -921,7 +921,7 @@
                     let to_delete = $('input[name="delete_saved_character"]').is(':checked');
                     let id = $('select[name="saved_default_character"]').val();
                     if (to_delete)
-                        return _delete_saved_character(id, this._default_character_list);
+                        return this._delete_saved_character(id, this._default_character_list);
                     for (let default_character of this._default_character_list) {
                         if (default_character.id == id) {
                             for (const character of this.character_list)
@@ -942,7 +942,7 @@
                     let id = $('select[name="saved_generic_character"]').val();
                     let to_delete = $('input[name="delete_saved_character"]').is(':checked');
                     if (to_delete)
-                        return _delete_saved_character(id, this._generic_character_list);
+                        return this._delete_saved_character(id, this._generic_character_list);
                     let nb = $('input[name="number_saved_generic_characters"]').val();
                     let generic_character;
                     for (generic_character of this._generic_character_list)
