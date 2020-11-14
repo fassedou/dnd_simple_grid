@@ -493,6 +493,7 @@
                     this.__mouse_down = this._mouse_down.bind(this);
                     this.__mouse_up = this._mouse_up.bind(this);
                     this.__mouse_enter = this._mouse_enter.bind(this);
+                    this.__key_pressed = this._key_pressed.bind(this);
                 }
 
                 decorations_from_string(data) {
@@ -539,6 +540,7 @@
                         td.addEventListener("mouseup", this.__mouse_up);
                     }
                     document.querySelector('#grid').addEventListener('mouseleave', this.__mouse_up);
+                    document.querySelector('body').addEventListener('keypress', this.__key_pressed);
                     $('#td_setting').html('✅');
                 }
                 
@@ -553,10 +555,15 @@
                         td.removeEventListener("mouseup", this.__mouse_up);
                     }
                     document.querySelector('#grid').removeEventListener('mouseleave', this.__mouse_up);
+                    document.querySelector('body').removeEventListener('keypress', this.__key_pressed);
                     $('#td_setting').html('⚙️');
                 }
 
-
+                _key_pressed(e) {
+                    if (e.key === 'Escape' || e.key === 'Enter')
+                        this.stop_decoration();
+                }
+                
                 _mouse_down(e) {
                     this._mouse_click_is_down = true;
                     this._decorate_case(e);
@@ -606,7 +613,8 @@
                     this._moving_character = null;
                     this._init_x = null;
                     this._init_y = null;
-                    this.__mouse_move = this._mouse_move.bind(this)
+                    this.__mouse_move = this._mouse_move.bind(this);
+                    this.__key_pressed = this._key_pressed.bind(this);
                 }
 
                 init() {
@@ -630,6 +638,7 @@
                             }
                             break;
                         }
+                    document.querySelector('body').addEventListener('keypress', this.__key_pressed);
                 }
 
                 _mouse_move(e) {
@@ -648,6 +657,11 @@
                     $('#movement_arrow_container line').attr('y2', e.pageY);
                     this._set_visible(true); 
                 }
+
+                _key_pressed(e) {
+                    if (e.key === 'Escape')
+                        this.stop_movement();
+                }
                 
                 destination_selected(grid_case, row, col) {
                     if (grid_manager.is_empty(row, col)) {
@@ -660,6 +674,7 @@
                     this.is_moving = false;
                     this._moving_character = null;
                     document.removeEventListener('mousemove', this.__mouse_move);
+                    document.querySelector('body').removeEventListener('keypress', this.__key_pressed);
                     this._set_visible(false);
                 }
 
@@ -672,6 +687,7 @@
             class SettingsManager {
                 constructor() {
                     this._json_manager = new JsonManager();
+                    this.__key_pressed = this._key_pressed.bind(this);
                 }
 
                 save_state() {
@@ -699,11 +715,13 @@
                     $('input[name="pix"]').val(case_pix_size);
                     $('input[name="dim"]').val(grid_dimension);
                     $('#settings_container').css('display', 'block');
+                    document.querySelector('body').addEventListener('keypress', this.__key_pressed);
                 }
 
                 cancel() {
                     $("#settings_container").css("display","none");
                     $('#dice_result').val('');
+                    document.querySelector('body').removeEventListener('keypress', this.__key_pressed);
                 }
 
                 clear_characters() {
@@ -728,8 +746,7 @@
                     grid_manager.decoration.start_decoration(remove);
                     this.cancel();
                 }
-
-                                
+         
                 update_grid() {
                     let irl_size = parseInt($('input[name="irl_size"]').val());
                     let pix = parseInt($('input[name="pix"]').val());
@@ -758,13 +775,17 @@
                     lg = $('select[name="lg"]').val();
                     $('[tr="true"]').each(function() {
                         let key_tr = $(this).attr('key_tr');
-                        console.log($(this));
                         $(this).html(tr(key_tr));
                     });
                     $('[tr="true_ph"]').each(function() {
                         let key_tr = $(this).attr('key_tr');
                         $(this).attr('placeholder', tr(key_tr));
                     });
+                }
+
+                _key_pressed(e) {
+                    if (e.key === 'Escape')
+                        this.cancel();
                 }
 
             };
@@ -777,6 +798,7 @@
                     this._generic_character_list = [];
                     this._creator_parameters = null;
                     this._modified_character = null;
+                    this.__key_pressed = this._key_pressed.bind(this);
                 }
 
 
@@ -815,7 +837,22 @@
                         $('#character_creator select[name="saved_default_character"]').append('<option class="generated_options" value="'+character.id+'">'+character.name+'</option>');
                     for (const character of this._generic_character_list)
                         $('#character_creator select[name="saved_generic_character"]').append('<option class="generated_options" value="'+character.id+'">'+character.name+'</option>');
-                    $('#character_creator_container').css('display', 'block');
+                    this._open_window();
+                }
+
+                _open_window() {
+                   $('#character_creator_container').css('display', 'block');
+                   document.querySelector('body').addEventListener('keypress', this.__key_pressed);
+                }
+
+                _key_pressed(e) {
+
+                    if ($('textarea').is(":focus"))
+                        return;
+                    if (e.key === 'Escape')
+                        this.cancel();
+                    else if (e.key === 'Enter')
+                        this.validate();
                 }
 
                 validate() {
@@ -834,6 +871,7 @@
                     $('#character_creator_container form').trigger('reset');
                     $('.generated_options').remove();
                     $('#save_character').html('');
+                    document.querySelector('body').removeEventListener('keypress', this.__key_pressed);
                 }
 
                 _add_new_character() {
@@ -880,7 +918,7 @@
                     $('input[name="size_character"]').val(character.size);
                     $('textarea[name="description"]').val(character.description);
                     $('#save_character').html('<td><a class="validate" tr="true" key_tr="save_default" onclick="character_manager.save_character('+character.id+')">'+tr('save_default')+'</a></td><td><a onclick="character_manager.save_character_as_generic('+character.id+')" class="validate" tr="true" key_tr="save_generic">'+tr('save_generic')+'</a></td>');
-                    $('#character_creator_container').css('display', 'block');
+                    this._open_window();
                 }
 
                 save_character(id) {
