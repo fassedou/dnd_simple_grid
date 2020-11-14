@@ -137,6 +137,10 @@
                 overflow: scroll;
                 z-index : 12;
             }
+            .description a {
+                color: white;
+                text-decoration: underline;
+            }
             .description table {
                 width : 100%;
             }
@@ -245,7 +249,7 @@
                 'color' : 'Couleur',
                 'size' : 'Taille (en cm)',
                 'other' : 'Autre',
-                'default_desc' : 'CA ? • PV ?/? • Vit ?m',
+                'default_desc' : 'CA ? • PV ?/? • Vit ?m • url[https://www.aidedd.org/dnd/monstres.php?vf=garde][Fiche du personnage]',
                 'validate' : 'Valider',
                 'clear' : 'Vider',
                 'dice' : 'Dés',
@@ -286,7 +290,7 @@
                 'color' : 'Color',
                 'size' : 'Size (in cm)',
                 'other' : 'Other',
-                'default_desc' : 'AC ? • HP ?/? • Speed ?m',
+                'default_desc' : 'AC ? • HP ?/? • Speed ?m • url[https://www.aidedd.org/dnd/monstres.php?vo=guard][Character sheet]',
                 'validate' : 'Confirm',
                 'clear' : 'Clear',
                 'dice' : 'Dice',
@@ -365,7 +369,6 @@
                     _character_id = id;
                 }
 
-
                 constructor(name, initials, color, size, description, row, col, grid_case, id=-1) {
                     this.name = name;
                     this.color = color;
@@ -402,7 +405,7 @@
                     $('#grid').after(character_div_html);
                     this.character_div = $("#p"+this.id);
                     this.character_div.css({'width' : case_pix_size/2, 'height' : case_pix_size/2, 'background-color' : this.color, 'left' : x, 'top' : y, 'margin-left' : -case_pix_size/4, 'margin-top' : -case_pix_size/4});                
-                    let description_div = '<div class="description"><table><tr><td><h3>' + this.name + '</h3></td></tr><tr><td><span id="modify_character" tr="true" key_tr="modify" onclick="character_manager.modify_button_handler('+this.id+')">'+tr('modify')+'</span> • <span id="delete_character" tr="true" key_tr="delete" onclick="character_manager.delete_button_handler('+this.id+')">'+tr('delete')+'</span></td></tr><tr><td>' + this.description + '</td></tr></table></div>';
+                    let description_div = '<div class="description"><table><tr><td><h3>' + this.name + '</h3></td></tr><tr><td><span id="modify_character" tr="true" key_tr="modify" onclick="character_manager.modify_button_handler('+this.id+')">'+tr('modify')+'</span> • <span id="delete_character" tr="true" key_tr="delete" onclick="character_manager.delete_button_handler('+this.id+')">'+tr('delete')+'</span></td></tr><tr><td>' + this._get_description() + '</td></tr></table></div>';
                     this.character_div.append(description_div);
                 }
 
@@ -429,6 +432,15 @@
                     this.row = row;
                     this.col = col;
                     this.create();
+                }
+
+                _get_description() {
+                    const re = /url\[([^\]\[]+)\]\[([^\]\[]+)\]/gm;
+                    const array = [...this.description.matchAll(re)];
+                    let new_desc = this.description;
+                    for (const match of array)
+                        new_desc = new_desc.replace(match[0], '<a target="_blank" href="'+match[1]+'">'+match[2]+'</a>');
+                    return new_desc;
                 }
 
             }
