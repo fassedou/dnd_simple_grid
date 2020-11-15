@@ -144,17 +144,16 @@
             .description table {
                 width : 100%;
             }
-            #modify_character {
+            .modify_character {
                 color : rgb(106, 255, 243);
             }
-            #delete_character {
+            .delete_character {
                 color : rgb(250, 188, 179);
             }
-            .description span {
+            .modify_character, .delete_character {
                 text-decoration: underline;
                 cursor : pointer;
             }
-
             .description td {
                 color : white;
                 text-align : center;
@@ -165,6 +164,22 @@
             }
             .character:hover .description {
                 display: block;
+            }
+            .sign_button {
+                border : 1px solid white;
+                cursor : pointer;
+                border-radius: 100%;
+                text-decoration: none;
+                font-size : 0.5em;
+                padding : 0 0.25em;
+                text-align: center;
+                margin : 0 0.25em;
+            }
+            .sign_button:hover {
+                background-color: rgba(255,255,255,0.2);
+            }
+            .sign_button:active {
+                background-color: rgba(255,255,255,0.4);
             }
             #distance_viewer {
                 position : absolute;
@@ -182,6 +197,9 @@
                 position: absolute;
                 display: none;
                 z-index: -20;
+            }
+            h3 {
+                margin : 0;
             }
         </style>
         <!-- External libs -->
@@ -249,7 +267,7 @@
                 'color' : 'Couleur',
                 'size' : 'Taille (en cm)',
                 'other' : 'Autre',
-                'default_desc' : 'CA ? • PV ?/? • Vit ?m • url[https://www.aidedd.org/dnd/monstres.php?vf=garde][Fiche du personnage]',
+                'default_desc' : 'CA ? • PV #[10]/10 • Vit ?m • url[https://www.aidedd.org/dnd/monstres.php?vf=garde][Fiche du personnage]',
                 'validate' : 'Valider',
                 'clear' : 'Vider',
                 'dice' : 'Dés',
@@ -290,7 +308,7 @@
                 'color' : 'Color',
                 'size' : 'Size (in cm)',
                 'other' : 'Other',
-                'default_desc' : 'AC ? • HP ?/? • Speed ?m • url[https://www.aidedd.org/dnd/monstres.php?vo=guard][Character sheet]',
+                'default_desc' : 'AC ? • HP #[10]/10 • Speed ?m • url[https://www.aidedd.org/dnd/monstres.php?vo=guard][Character sheet]',
                 'validate' : 'Confirm',
                 'clear' : 'Clear',
                 'dice' : 'Dice',
@@ -405,7 +423,7 @@
                     $('#grid').after(character_div_html);
                     this.character_div = $("#p"+this.id);
                     this.character_div.css({'width' : case_pix_size/2, 'height' : case_pix_size/2, 'background-color' : this.color, 'left' : x, 'top' : y, 'margin-left' : -case_pix_size/4, 'margin-top' : -case_pix_size/4});                
-                    let description_div = '<div class="description"><table><tr><td><h3>' + this.name + '</h3></td></tr><tr><td><span id="modify_character" tr="true" key_tr="modify" onclick="character_manager.modify_button_handler('+this.id+')">'+tr('modify')+'</span> • <span id="delete_character" tr="true" key_tr="delete" onclick="character_manager.delete_button_handler('+this.id+')">'+tr('delete')+'</span></td></tr><tr><td>' + this._get_description() + '</td></tr></table></div>';
+                    let description_div = '<div class="description"><table><tr><td><h3>' + this.name + '</h3></td></tr><tr><td><span class="modify_character" tr="true" key_tr="modify" onclick="character_manager.modify_button_handler('+this.id+')">'+tr('modify')+'</span> • <span class="delete_character" tr="true" key_tr="delete" onclick="character_manager.delete_button_handler('+this.id+')">'+tr('delete')+'</span></td></tr><tr><td class="description_content">' + this._get_description() + '</td></tr></table></div>';
                     this.character_div.append(description_div);
                 }
 
@@ -435,12 +453,37 @@
                 }
 
                 _get_description() {
-                    const re = /url\[([^\]\[]+)\]\[([^\]\[]+)\]/gm;
-                    const array = [...this.description.matchAll(re)];
+                    const re_url = /url\[([^\]\[]+)\]\[([^\]\[]+)\]/gm;
+                    const array_url = [...this.description.matchAll(re_url)];
                     let new_desc = this.description;
-                    for (const match of array)
+                    for (const match of array_url)
                         new_desc = new_desc.replace(match[0], '<a target="_blank" href="'+match[1]+'">'+match[2]+'</a>');
+
+                    const re_counter = /#\[([+-]?[0-9]*)\]/gm;
+                    const array_counter = [...this.description.matchAll(re_counter)];
+                    for (let i=0; i<array_counter.length; i++)
+                        new_desc = new_desc.replace(array_counter[i][0], '<span onclick="inc_ele($(this).next(), -1);$(this).next().trigger(\'input\');" class="sign_button">-</span><input desc_index="'+i+'" cid="'+this.id+'" class="nb_desc" type="text" value="'+array_counter[i][1]+'" oninput="character_manager.change_number_description('+this.id+', $(this));" size="'+Math.max(array_counter[i][1].length,1)+'"/><span onclick="inc_ele($(this).prev(), +1);$(this).prev().trigger(\'input\');" class="sign_button">+</span>');
                     return new_desc;
+                }
+
+                change_number_description(input) {
+                    let check_input = /^[+-]?\d*$/;
+                    if (!check_input.test(input.val()))
+                        return input.val(input.attr('value'));
+                    input.attr('size', Math.max(input.val().length, 1));
+                    input.attr('value', input.val());
+                    let displayed_desc = $('#p'+this.id + ' .description_content').html();
+                    const re_counter = /<span onclick="inc_ele\(\$\(this\)\.next\(\), -1\);\$\(this\)\.next\(\)\.trigger\('input'\);" class="sign_button">-<\/span><input desc_index="(\d+)" cid="\d+" class="nb_desc" type="text" value="[+-]?\d*" oninput="character_manager\.change_number_description\(\d+, \$\(this\)\);" size="\d+"\/?><span onclick="inc_ele\(\$\(this\)\.prev\(\), \+1\);\$\(this\)\.prev\(\)\.trigger\('input'\);" class="sign_button">\+<\/span>/gm;
+                    const array_counter = [...displayed_desc.matchAll(re_counter)];
+                    for (const match of array_counter)
+                        displayed_desc = displayed_desc.replace(match[0], '#['+$('input[cid="'+this.id+'"][desc_index="'+match[1]+'"]').val()+']');
+
+                    const re_url = /<a target="_blank" href="([^"]+)">(.+?)<\/a>/gm;
+                    const array_url = [...displayed_desc.matchAll(re_url)];
+                    for (const match of array_url)
+                        displayed_desc = displayed_desc.replace(match[0], 'url['+match[1]+']['+match[2]+']');
+
+                    this.description = displayed_desc;
                 }
 
             }
@@ -1036,6 +1079,12 @@
                     this.character_list = [];
                     Character.set_character_id(this._default_character_list.length);
                 }
+
+                change_number_description(id, input) {
+                    for (let character of this.character_list)
+                        if (character.id == id)
+                            return character.change_number_description(input);
+                }
             };
 
             class GridManager {
@@ -1123,6 +1172,13 @@
                 }
 
             };
+
+            function inc_ele(ele, inc) {
+                let val = parseInt(ele.val());
+                if (isNaN(val))
+                    val = 0;
+                ele.val(val+inc);
+            }
 
             let grid_manager;
             let character_manager;
