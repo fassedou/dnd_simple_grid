@@ -51,7 +51,7 @@
                 background-color : black;
                 overflow : scroll;
                 padding : 20px;
-                z-index: 20;
+                z-index: 19;
             }
             #character_creator {
                 left: 35%;
@@ -95,7 +95,7 @@
             }
             #back_character_creator_container, #back_settings {
                 position : absolute;
-                background-color : rgba(0,0,0,0.5);
+                background-color : black;
                 width:100%;
                 height:100%;
                 top:0;
@@ -201,6 +201,28 @@
             h3 {
                 margin : 0;
             }
+            .lighter {
+                position: fixed;
+                z-index : 20;
+                background-color: black;
+                position: fixed;
+            }
+            #l_left {
+                left : 0;
+                height : 100%;
+            }
+            #l_right {
+                right : 0;
+                height : 100%;
+            }
+            #l_top {
+                top : 0;
+                width : 100%;
+            }
+            #l_bottom {
+                bottom : 0;
+                width : 100%;
+            }
         </style>
         <!-- External libs -->
         <script>
@@ -242,6 +264,7 @@
             let case_irl_size = 150; // Size of a case IRL (in centimetres)
             let case_pix_size = 40; // Size of a case in pixels
             let grid_dimension = 25; // The grid has grid_dimension x grid_dimension cases
+            let size_lighter = 5; // The dimension (in cases) of the enlighted area when lighting is activate;
             let lg = 'English';
 
             let french = {
@@ -731,6 +754,12 @@
                 constructor() {
                     this._json_manager = new JsonManager();
                     this.__key_pressed = this._key_pressed.bind(this);
+                    this.__lighter_settings = this._lighter_settings.bind(this);
+                    this.__lighter_update = this._lighter_update.bind(this);
+                    this._semaphore_dice = true;
+                    this._x_mouse = 0;
+                    this._y_mouse = 0;
+                    this.is_lighting = false;
                 }
 
                 save_state() {
@@ -754,6 +783,9 @@
                         return grid_manager.decoration.stop_decoration();
                     if (character_manager.movement_manager.is_moving)
                         character_manager.movement_manager.stop_movement();
+                    if (this.is_lighting)
+                        this.hide_lighter();
+                    $('#back_settings').css('background-color',  this.is_lighting ? 'black' : 'rgba(0,0,0,0.5)');
                     $('input[name="irl_size"]').val(case_irl_size);
                     $('input[name="pix"]').val(case_pix_size);
                     $('input[name="dim"]').val(grid_dimension);
@@ -765,6 +797,8 @@
                     $("#settings_container").css("display","none");
                     $('#dice_result').val('');
                     document.querySelector('body').removeEventListener('keypress', this.__key_pressed);
+                    if (this.is_lighting)
+                        this.show_lighter();
                 }
 
                 clear_characters() {
@@ -780,9 +814,13 @@
                 }
 
                 throw_dice() {
+                    if (!this._semaphore_dice)
+                        return;
                     let dice_type = parseInt($('input[name="dice"]').val());
                     let result = Math.floor(Math.random() * dice_type) + 1;
-                    $('#dice_result').val(result);
+                    $('#dice_result').val('⏳');
+                    this._semaphore_dice = false;
+                    setTimeout(() => {$('#dice_result').val(result);this._semaphore_dice = true;}, 200);
                 }
 
                 start_decoration(remove) {
@@ -831,6 +869,53 @@
                         this.cancel();
                 }
 
+                start_lighting() {
+                    this.cancel();
+                    this.show_lighter();
+                    this.is_lighting = true;
+                }
+
+                show_lighter() {
+                    document.querySelector('body').addEventListener('keypress', this.__lighter_settings);
+                    document.querySelector('body').addEventListener('mousemove', this.__lighter_update);
+                    $('body > *').css('opacity', 0);
+                    $('body').css('background-color', 'black')
+                    $('.lighter').css('display', 'block');    
+                    setTimeout(() => {$('body > *').css('opacity', 1);$('body').css('background-color', 'white');}, 200);
+                }
+
+                _lighter_settings(e) {
+                    switch(e.key) {
+                        case 'Escape':
+                            this.is_lighting = false;   
+                            return this.hide_lighter();
+                        case '+':
+                            size_lighter = Math.min(grid_dimension, size_lighter+1);
+                            break;
+                        case '-':
+                            size_lighter = Math.max(0, size_lighter-1);
+                            break;                        
+                    }
+                    this._lighter_update(e);
+                }
+                
+                hide_lighter() {
+                    document.querySelector('body').removeEventListener('keypress', this.__lighter_settings);
+                    document.querySelector('body').removeEventListener('mousemove', this.__lighter_update);
+                    $('.lighter').css('display', 'none');
+                }
+
+                _lighter_update(e) {
+                    this._x_mouse = e.clientX != undefined ? e.clientX : this._x_mouse;
+                    this._y_mouse = e.clientY != undefined ? e.clientY : this._y_mouse;
+                    let win_w = window.innerWidth;
+                    let win_h = window.innerHeight;
+                    let pix_lighter = size_lighter*case_pix_size;
+                    $('#l_left').css('width', this._x_mouse-0.5*pix_lighter >= 0 ? this._x_mouse-0.5*pix_lighter : 0);
+                    $('#l_right').css('width', (win_w-this._x_mouse)-0.5*pix_lighter >= 0 ?  (win_w-this._x_mouse)-0.5*pix_lighter : 0);
+                    $('#l_top').css('height', this._y_mouse-0.5*pix_lighter >= 0 ? this._y_mouse-0.5*pix_lighter : 0);
+                    $('#l_bottom').css('height', (win_h-this._y_mouse)-0.5*pix_lighter >= 0 ?  (win_h-this._y_mouse)-0.5*pix_lighter : 0);
+                }
             };
 
             class CharacterManager {
@@ -884,12 +969,14 @@
                 }
 
                 _open_window() {
-                   $('#character_creator_container').css('display', 'block');
-                   document.querySelector('body').addEventListener('keypress', this.__key_pressed);
+                    if (settings_manager.is_lighting)
+                        settings_manager.hide_lighter();
+                    $('#back_character_creator_container').css('background-color',  settings_manager.is_lighting ? 'black' : 'rgba(0,0,0,0.5)');
+                    $('#character_creator_container').css('display', 'block');
+                    document.querySelector('body').addEventListener('keypress', this.__key_pressed);
                 }
 
                 _key_pressed(e) {
-
                     if ($('textarea').is(":focus"))
                         return;
                     if (e.key === 'Escape')
@@ -914,6 +1001,8 @@
                     $('#character_creator_container form').trigger('reset');
                     $('.generated_options').remove();
                     $('#save_character').html('');
+                    if (settings_manager.is_lighting)
+                        settings_manager.show_lighter();
                     document.querySelector('body').removeEventListener('keypress', this.__key_pressed);
                 }
 
@@ -1211,6 +1300,7 @@
         </script>
     </head>
     <body onload='main()'>
+        <div class='lighter' id='l_left'></div><div class='lighter' id='l_right'></div><div class='lighter' id='l_top'></div><div class='lighter' id='l_bottom'></div>
         <svg id='movement_arrow_container'><line stroke='black'/></svg>
         <div id='distance_viewer'><span tr='true' key_tr='movement'></span> : <span id="distance_viewer_nb"></span></div>
         <table id='grid'><tbody></tbody></table>
@@ -1256,7 +1346,7 @@
                         <tr>
                             <td><a onclick='settings_manager.clear_decoration();' class='validate' tr='true' key_tr='decorations'></a></td>
                             <td>🎲 : <input class='settings_input' type='text' disabled id='dice_result'/></td>
-                            <td><span onclick='settings_manager.start_decoration(true);' style="cursor:pointer">🗑</span></td>
+                            <td><span onclick='settings_manager.start_decoration(true);' style="cursor:pointer">🗑</span> • <span onclick='settings_manager.start_lighting();' style="cursor:pointer">💡</span></td>
                             <td><span tr='true' key_tr='irl_size'></span> <input type='number' min='1' name='irl_size' class='settings_input' /> <a onclick='settings_manager.update_grid();' class='validate' tr='true' key_tr='validate'>Valider</a></td>
                         </tr>
                     </table>
