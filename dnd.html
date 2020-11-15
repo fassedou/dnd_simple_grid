@@ -305,7 +305,8 @@
                 'dimension' : 'Dimension',
                 'decorations' : 'Décorations',
                 'irl_size' : 'Taille case (en cm)',
-                'error' : 'Une erreur s\'est produite : '
+                'error' : 'Une erreur s\'est produite : ',
+                'light_info' : 'Appuyez sur + ou - pour augmenter/diminuer la taille. Appuez sur Échap pour revenir à la normale.'
             };
 
             let english = {
@@ -346,7 +347,8 @@
                 'dimension' : 'Dimension',
                 'decorations' : 'Decorations',
                 'irl_size' : 'Case size (in cm)',
-                'error' : 'An error occured : '
+                'error' : 'An error occured : ',
+                'light_info' : 'Press + or - to increase/decrease the size. Press Escape to return to normal.'
             };
 
             let translations = {'English' : english, 'Français' : french};
@@ -372,6 +374,9 @@
                         character_manager.character_list_from_string(data['cha']);
                         grid_manager.decoration.decorations_from_string(data['dec']);
                         lg = data['lg'];
+                        size_lighter = data['sl'];
+                        settings_manager.is_lighting = data['lon'];
+                        $('#back_settings').css('background-color',  settings_manager.is_lighting ? 'black' : 'rgba(0,0,0,0.5)');
                         return true;
                     } catch(err) {
                         alert(tr('error') + err);
@@ -391,6 +396,8 @@
                     data['sgc'] = character_manager.serialize(2);
                     data['dec'] = grid_manager.decoration.serialize();
                     data['lg'] = lg;
+                    data['sl'] = size_lighter;
+                    data['lon'] = settings_manager.is_lighting;
                     return JSON.stringify(data);
                 }
             };
@@ -871,8 +878,14 @@
 
                 start_lighting() {
                     this.cancel();
-                    this.show_lighter();
-                    this.is_lighting = true;
+                    if (!this.is_lighting) {
+                        this.show_lighter();
+                        this.is_lighting = true;
+                        alert(tr('light_info'));
+                    } else {
+                        this.is_lighting = false;
+                        this.hide_lighter();
+                    }
                 }
 
                 show_lighter() {
