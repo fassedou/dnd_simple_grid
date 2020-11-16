@@ -54,9 +54,9 @@
                 z-index: 19;
             }
             #character_creator {
-                left: 35%;
-                top: 20%;
-                width : 30%;
+                left: 30%;
+                top: 10%;
+                width : 40%;
             }
 
             #settings {
@@ -92,6 +92,13 @@
             }
             #character_creator input, #character_creator select, #character_creator textarea, #settings input {
                 font-size: 1em;
+            }
+            #character_creator input[type='text'], #character_creator input[type='number'], #character_creator textarea {
+                width : 100%;
+            }
+            #character_creator textarea {
+                resize: vertical;
+                height : 5em;
             }
             #back_character_creator_container, #back_settings {
                 position : absolute;
@@ -133,7 +140,8 @@
                 background-color: black;
                 display:none;
                 width : 200px;
-                height : 150px;
+                padding-bottom : 10px;
+                max-height : 200px;
                 overflow: scroll;
                 z-index : 12;
             }
@@ -164,6 +172,12 @@
             }
             .character:hover .description {
                 display: block;
+            }
+            .character_dice_input {
+                font-size:1em;
+            }
+            .character_dice {
+                cursor : pointer;
             }
             .sign_button {
                 border : 1px solid white;
@@ -290,7 +304,7 @@
                 'color' : 'Couleur',
                 'size' : 'Taille (en cm)',
                 'other' : 'Autre',
-                'default_desc' : 'CA ? • PV #[10]/10 • Vit ?m • url[https://www.aidedd.org/dnd/monstres.php?vf=garde][Fiche du personnage]',
+                'default_desc' : 'CA ? • PV #[10]/10 • Vit ?m \n Jet d\'attaque : ?[1d20+3]\nDégats : ?[2d8+2]\nurl[https://www.aidedd.org/dnd/monstres.php?vf=garde][Fiche du personnage]',
                 'validate' : 'Valider',
                 'clear' : 'Vider',
                 'dice' : 'Dés',
@@ -332,7 +346,7 @@
                 'color' : 'Color',
                 'size' : 'Size (in cm)',
                 'other' : 'Other',
-                'default_desc' : 'AC ? • HP #[10]/10 • Speed ?m • url[https://www.aidedd.org/dnd/monstres.php?vo=guard][Character sheet]',
+                'default_desc' : 'AC ? • HP #[10]/10 • Speed ?m\nAttack roll : ?[1d20+3]\nDamages : ?[2d8+2]\nurl[https://www.aidedd.org/dnd/monstres.php?vo=guard][Character sheet]',
                 'validate' : 'Confirm',
                 'clear' : 'Clear',
                 'dice' : 'Dice',
@@ -421,7 +435,7 @@
                     this.name = name;
                     this.color = color;
                     this.size = size;
-                    this.description = description;
+                    this.description = typeof description === 'string' ? this._create_description(description) : description;
                     this.row = row;
                     this.col = col;
                     this.grid_case = grid_case;
@@ -432,7 +446,7 @@
                 }
 
                 serialize() {
-                    return {'nam':this.name, 'ini': this.initials, 'clr':this.color, 'siz':this.size, 'des':this.description, 'row' : this.row, 'col' : this.col, 'id': this.id};
+                    return {'nam':this.name, 'ini': this.initials, 'clr':this.color, 'siz':this.size, 'des':this.description_to_string(), 'row' : this.row, 'col' : this.col, 'id': this.id};
                 }
 
                 static from_string(map) {
@@ -462,7 +476,7 @@
                     this.initials = initials;
                     this.color = color;
                     this.size = size;
-                    this.description = description;
+                    this.description = this._create_description(description);
                     this.remove();
                     this.create();
                 }
@@ -482,41 +496,68 @@
                     this.create();
                 }
 
-                _get_description() {
-                    const re_url = /url\[([^\]\[]+)\]\[([^\]\[]+)\]/gm;
-                    const array_url = [...this.description.matchAll(re_url)];
-                    let new_desc = this.description;
-                    for (const match of array_url)
-                        new_desc = new_desc.replace(match[0], '<a target="_blank" href="'+match[1]+'">'+match[2]+'</a>');
+                _create_description(str_desc) {
+                    let desc = [];
+                    let current_char = 0;
+                    while (current_char < str_desc.length) {
+                        let tmp = str_desc.slice(current_char);
+                        let min_match = null;
+                        let min_re = null;
+                        let min_type = null;
+                        for (let [type, re] of Object.entries(character_manager.regex_description)) {
+                            let m = re.regex.exec(tmp);
+                            if (m && (!min_match || m.index < min_match.index)) {
+                                min_match = m;
+                                min_re = re;
+                                min_type = type;
+                            }
+                        }
+                        if (!min_match) {
+                            desc.push({'type':'text', 'value':[[tmp]]});
+                            return desc;
+                        }
+                        else if (min_match.index) {
+                            desc.push({'type':'text', 'value':[[tmp.slice(0, min_match.index)]]});
+                            current_char += min_match.index;
+                        }
+                        else {
+                            desc.push({'type':min_type, 'value': [min_match, desc.length, this]});
+                            current_char += min_match[0].length;
+                        }
+                    }
+                    return desc;
+                }
 
-                    const re_counter = /#\[([+-]?[0-9]*)\]/gm;
-                    const array_counter = [...this.description.matchAll(re_counter)];
-                    for (let i=0; i<array_counter.length; i++)
-                        new_desc = new_desc.replace(array_counter[i][0], '<span onclick="inc_ele($(this).next(), -1);$(this).next().trigger(\'input\');" class="sign_button">-</span><input desc_index="'+i+'" cid="'+this.id+'" class="nb_desc" type="text" value="'+array_counter[i][1]+'" oninput="character_manager.change_number_description('+this.id+', $(this));" size="'+Math.max(array_counter[i][1].length,1)+'"/><span onclick="inc_ele($(this).prev(), +1);$(this).prev().trigger(\'input\');" class="sign_button">+</span>');
-                    return new_desc;
+                description_to_string() {
+                    let str_desc = '';
+                    for (const desc of this.description)
+                        str_desc += desc.value[0][0];
+                    return str_desc;             
+                }
+
+                _get_description() {
+                    let str_desc = '';
+                    for (const desc of this.description) {
+                        if (desc.type == 'text')
+                            str_desc += desc.value[0][0];
+                        else
+                            str_desc += character_manager.regex_description[desc.type].shown(...desc.value);
+                    }
+                    return str_desc.replace(/(?:\r\n|\r|\n)/g, '<br/>');
                 }
 
                 change_number_description(input) {
                     let check_input = /^[+-]?\d*$/;
-                    if (!check_input.test(input.val()))
+                    let val = input.val();
+                    if (!check_input.test(val))
                         return input.val(input.attr('value'));
-                    input.attr('size', Math.max(input.val().length, 1));
-                    input.attr('value', input.val());
-                    let displayed_desc = $('#p'+this.id + ' .description_content').html();
-                    const re_counter = /<span onclick="inc_ele\(\$\(this\)\.next\(\), -1\);\$\(this\)\.next\(\)\.trigger\('input'\);" class="sign_button">-<\/span><input desc_index="(\d+)" cid="\d+" class="nb_desc" type="text" value="[+-]?\d*" oninput="character_manager\.change_number_description\(\d+, \$\(this\)\);" size="\d+"\/?><span onclick="inc_ele\(\$\(this\)\.prev\(\), \+1\);\$\(this\)\.prev\(\)\.trigger\('input'\);" class="sign_button">\+<\/span>/gm;
-                    const array_counter = [...displayed_desc.matchAll(re_counter)];
-                    for (const match of array_counter)
-                        displayed_desc = displayed_desc.replace(match[0], '#['+$('input[cid="'+this.id+'"][desc_index="'+match[1]+'"]').val()+']');
-
-                    const re_url = /<a target="_blank" href="([^"]+)">(.+?)<\/a>/gm;
-                    const array_url = [...displayed_desc.matchAll(re_url)];
-                    for (const match of array_url)
-                        displayed_desc = displayed_desc.replace(match[0], 'url['+match[1]+']['+match[2]+']');
-
-                    this.description = displayed_desc;
+                    input.attr('size', Math.max(val.length, 1));
+                    input.attr('value', val);
+                    let index = parseInt(input.attr('desc_index'));
+                    this.description[index].value = [['#['+val+']', val], index, this];
                 }
 
-            }
+            };
 
             let _generator_id = 0;
             class CharacterGenerator {
@@ -932,11 +973,30 @@
             };
 
             class CharacterManager {
+
+                static throw_dice(dice, ele) {
+                    let res = 0;
+                    let blocks = dice.replace(/-/g, '+-').split('+');
+                    for (const bl of blocks) {
+                        if (!bl.includes('d'))
+                            res += parseInt(bl);
+                        else {
+                            let times = parseInt(bl.split('d')[0]);
+                            let faces = parseInt(bl.split('d')[1]);
+                            for (let i=0; i<times; i++)
+                                res += Math.floor(Math.random() * faces) + 1;
+                        }
+                    }
+                    ele.val(res.toString());
+                    ele.attr('size', Math.max(2, ele.val().length));
+                }
+
                 constructor() {
                     this.movement_manager = new MovementManager();
                     this.character_list = [];
                     this._default_character_list = [];
                     this._generic_character_list = [];
+                    this.regex_description = this._create_regex_description();
                     this._creator_parameters = null;
                     this._modified_character = null;
                     this.__key_pressed = this._key_pressed.bind(this);
@@ -1036,7 +1096,7 @@
                         this.movement_manager.stop_movement();
                     for (let character of this.character_list)
                         if (character.id == id)
-                            return character_manager._open_modification_window(character);
+                            return this._open_modification_window(character);
                 }
 
                 delete_button_handler(id) {
@@ -1061,7 +1121,7 @@
                     $('input[name="initials"]').val(character.initials);
                     $('input[name="color_character"]').val(character.color);
                     $('input[name="size_character"]').val(character.size);
-                    $('textarea[name="description"]').val(character.description);
+                    $('textarea[name="description"]').val(character.description_to_string());
                     $('#save_character').html('<td><a class="validate" tr="true" key_tr="save_default" onclick="character_manager.save_character('+character.id+')">'+tr('save_default')+'</a></td><td><a onclick="character_manager.save_character_as_generic('+character.id+')" class="validate" tr="true" key_tr="save_generic">'+tr('save_generic')+'</a></td>');
                     this._open_window();
                 }
@@ -1186,6 +1246,29 @@
                     for (let character of this.character_list)
                         if (character.id == id)
                             return character.change_number_description(input);
+                }
+
+                _create_regex_description() {
+                    return {
+                        'url' : {
+                            'regex' : /url\[([^\]\[]+)\]\[([^\]\[]+)\]/m,
+                            'shown': (match, index, ele) => {
+                                return '<a target="_blank" href="'+match[1]+'">'+match[2]+'</a>';
+                            },
+                        },
+                        'counter' : {
+                            'regex' : /#\[([+-]?[0-9]*)\]/m,
+                            'shown': (match, index, ele) => {
+                                return '<span onclick="inc_ele($(this).next(), -1);$(this).next().trigger(\'input\');" class="sign_button">-</span><input desc_index="'+index+'" cid="'+ele.id+'" class="nb_desc" type="text" value="'+match[1]+'" oninput="character_manager.change_number_description('+ele.id+', $(this));" size="'+Math.max(match[1].length,1)+'"/><span onclick="inc_ele($(this).prev(), +1);$(this).prev().trigger(\'input\');" class="sign_button">+</span>';
+                            }
+                        },
+                        'dice' : {
+                            'regex' : /\?\[((?:\d+|\d+d\d+)(?:[+-](?:\d+|\d+d\d+))*)\]/m,
+                            'shown': (match, index, ele) => {
+                                return '<span class="character_dice" title="'+match[1]+'" onclick="CharacterManager.throw_dice(\''+match[1]+'\', $(this).next())">🎲</span> <input class="character_dice_input" disabled type="text" size="2" />';
+                            }
+                        }
+                    };
                 }
             };
 
@@ -1324,10 +1407,10 @@
                     <table>
                         <tr><td><a class='cancel' tr='true' key_tr='cancel' onclick='character_manager.cancel()'></a></td><td></td></tr>
                         <tr class='saved_character_select_tr'>
-                            <td><span tr='true' key_tr='autocompletion'>Pré-remplir</span> • 🗑 <input type='checkbox' name='delete_saved_character' /></td>
+                            <td><span tr='true' key_tr='autocompletion'>Pré-remplir</span></td>
                             <td><select onchange='character_manager.handler_default_character()' name='saved_default_character'><option tr='true' key_tr='character' disabled selected value></option></select> <span tr='true' key_tr='or'></span></td>
                         </tr><tr class='saved_character_select_tr'>
-                            <td></td><td><input type='number' min='1' style='width:15%' value='1' name='number_saved_generic_characters'/> x <select onchange='character_manager.handler_generic_character()' name='saved_generic_character'><option tr='true' key_tr='generic' disabled selected value></option></select></td>
+                            <td>🗑 <input type='checkbox' name='delete_saved_character' /></td><td><input type='number' min='1' style='width:15%' value='1' name='number_saved_generic_characters'/> x <select onchange='character_manager.handler_generic_character()' name='saved_generic_character'><option tr='true' key_tr='generic' disabled selected value></option></select></td>
                         </tr>
                         <tr><td tr='true' key_tr='name'></td><td><input tr='true_ph' key_tr='name' placeholder='Nom' type='text' name='name' /></td></tr>
                         <tr><td tr='true' key_tr='initials'></td><td><input maxlength='2' tr='true_ph' key_tr='initials' placeholder='Initiales' type='text' name='initials' /></td></tr>
