@@ -51,7 +51,7 @@
                 background-color : black;
                 overflow : scroll;
                 padding : 20px;
-                z-index: 19;
+                z-index: 18;
             }
             #character_creator {
                 left: 30%;
@@ -223,7 +223,7 @@
             }
             .lighter {
                 position: fixed;
-                z-index : 20;
+                z-index : 19;
                 background-color: black;
                 position: fixed;
             }
@@ -242,6 +242,21 @@
             #l_bottom {
                 bottom : 0;
                 width : 100%;
+            }
+            #simple_dice_result {
+                color : white;
+                background-color : black;
+                position: fixed;
+                font-size : 2em;
+                padding : 0.5em;
+                text-align: center;
+                z-index : 20;
+                border-radius : 20%;
+                box-shadow: 0 0 5px black;
+                display : none;
+            }
+            #simple_dice_result span {
+                font-size : 0.4em;
             }
         </style>
         <!-- External libs -->
@@ -313,6 +328,7 @@
                 'default_desc' : 'CA ? • PV #[10]/10 • Vit ?m \n Jet d\'attaque : ?[1d20+3]\nDégats : ?[2d8+2]\n![Dextérité,+3][Force,-1]\nurl[https://www.aidedd.org/dnd/monstres.php?vf=garde][Fiche du personnage]',
                 'validate' : 'Valider',
                 'clear' : 'Vider',
+                'simple_dice' : 'Sur la grille,<br/>appuyez sur "Entrer"<br/>pour faire rapidement ce lancé.',
                 'dice' : 'Dés',
                 'global_dice' : 'Dés globaux',
                 'dice_bonus' : 'Bonus',
@@ -358,6 +374,7 @@
                 'default_desc' : 'AC ? • HP #[10]/10 • Speed ?m\nAttack roll : ?[1d20+3]\nDamages : ?[2d8+2]\n![Dexterity,+3][Strength,-1]\nurl[https://www.aidedd.org/dnd/monstres.php?vo=guard][Character sheet]',
                 'validate' : 'Confirm',
                 'clear' : 'Clear',
+                'simple_dice' : 'On the grid, press "Enter"<br/>to quickly do this throw.',
                 'dice' : 'Dice',
                 'global_dice' : 'Global dice',
                 'dice_bonus' : 'Bonus',
@@ -818,6 +835,7 @@
                     this.__lighter_update = this._lighter_update.bind(this);
                     this._semaphore_dice = true;
                     this._x_mouse = 0;
+                    this.window_open = false;
                     this._y_mouse = 0;
                     this.is_lighting = false;
                 }
@@ -846,6 +864,7 @@
                     if (this.is_lighting)
                         this.hide_lighter();
                     this._update_dice_select();
+                    this.window_open = true;
                     $('#back_settings').css('background-color',  this.is_lighting ? 'black' : 'rgba(0,0,0,0.5)');
                     $('input[name="irl_size"]').val(case_irl_size);
                     $('input[name="pix"]').val(case_pix_size);
@@ -857,6 +876,7 @@
                 cancel() {
                     $("#settings_container").css("display","none");
                     $('#dice_result').val('');
+                    this.window_open = false;
                     document.querySelector('body').removeEventListener('keypress', this.__key_pressed);
                     if (this.is_lighting)
                         this.show_lighter();
@@ -1093,6 +1113,7 @@
                     this._creator_parameters = null;
                     this._modified_character = null;
                     this.__key_pressed = this._key_pressed.bind(this);
+                    this.window_open = false;
                 }
 
 
@@ -1137,6 +1158,7 @@
                 _open_window() {
                     if (settings_manager.is_lighting)
                         settings_manager.hide_lighter();
+                    this.window_open = true;
                     $('#back_character_creator_container').css('background-color',  settings_manager.is_lighting ? 'black' : 'rgba(0,0,0,0.5)');
                     $('#character_creator_container').css('display', 'block');
                     document.querySelector('body').addEventListener('keypress', this.__key_pressed);
@@ -1162,6 +1184,7 @@
                 cancel() {
                     this._modified_character = null;
                     this._creator_parameters = null;
+                    this.window_open = false;
                     $('.saved_character_select_tr').css('display', 'table-row');
                     $("#character_creator_container").css("display","none");
                     $('#character_creator_container form').trigger('reset');
@@ -1461,6 +1484,22 @@
                     }
                 }
 
+                simple_dice_throw() {
+                    if (settings_manager.window_open || character_manager.window_open || grid_manager.decoration.is_decorating || character_manager.movement_manager.is_moving)
+                        return;
+                    let dice = $('input[name="dice"]').val();
+                    if (dice == '')
+                        return;
+                    let res = CharacterManager.throw_dice(dice);
+                    let ele = $('#simple_dice_result');
+                    ele.html(res.toString()+'<br/><span>🎲 : '+dice+'</span>');
+                    ele.stop(true, true);
+                    ele.css('left', 'calc(50% - '+ele.width()/2+'px)');
+                    ele.css('top', 'calc(50% - '+ele.height()/2+'px)');
+                    ele.css('display', 'block');
+                    ele.fadeOut(1500, () => {ele.css('display', 'none');});
+                }
+
             };
 
             function inc_ele(ele, inc) {
@@ -1496,11 +1535,16 @@
                         if (['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key) == 0)
                             e.preventDefault();
                     });
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter')
+                        grid_manager.simple_dice_throw();
+                });
             }
 
         </script>
     </head>
     <body onload='main()'>
+        <div id='simple_dice_result'></div>
         <div class='lighter' id='l_left'></div><div class='lighter' id='l_right'></div><div class='lighter' id='l_top'></div><div class='lighter' id='l_bottom'></div>
         <svg id='movement_arrow_container'><line stroke='black'/></svg>
         <div id='distance_viewer'><span tr='true' key_tr='movement'></span> : <span id="distance_viewer_nb"></span></div>
@@ -1551,7 +1595,7 @@
                         </tr>
                         <tr>
                             <td><a onclick='settings_manager.clear_decoration();' class='validate' tr='true' key_tr='decorations'></a></td>
-                            <td>🎲 : <input class='settings_input' type='text' disabled id='dice_result'/></td>
+                            <td>🎲 : <input class='settings_input' type='text' disabled id='dice_result'/><br/><br/><span tr='true' key_tr='simple_dice'></span></td>
                             <td><table id='global_dice_result'></table></td>
                             <td><span onclick='settings_manager.start_decoration(true);' style="cursor:pointer">🗑</span> • <span onclick='settings_manager.start_lighting();' style="cursor:pointer">💡</span></td>
                             <td><a onclick='settings_manager.update_grid();' class='validate' tr='true' key_tr='validate'>Valider</a></td>
