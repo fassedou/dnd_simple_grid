@@ -79,7 +79,6 @@
             }
             #settings td, #settings th {
                 text-align : center;
-                width : 25%;
             }
             #settings .th {
                 color : white;
@@ -89,6 +88,9 @@
             }
             .settings_input {
                 width: 60px;
+            }
+            input:invalid {
+                border-color : red;
             }
             #character_creator input, #character_creator select, #character_creator textarea, #settings input {
                 font-size: 1em;
@@ -151,6 +153,10 @@
             }
             .description table {
                 width : 100%;
+            }
+            .desc_table, .desc_table td {
+                border-collapse: collapse;
+                border : 1px solid white;
             }
             .modify_character {
                 color : rgb(106, 255, 243);
@@ -304,10 +310,13 @@
                 'color' : 'Couleur',
                 'size' : 'Taille (en cm)',
                 'other' : 'Autre',
-                'default_desc' : 'CA ? • PV #[10]/10 • Vit ?m \n Jet d\'attaque : ?[1d20+3]\nDégats : ?[2d8+2]\nurl[https://www.aidedd.org/dnd/monstres.php?vf=garde][Fiche du personnage]',
+                'default_desc' : 'CA ? • PV #[10]/10 • Vit ?m \n Jet d\'attaque : ?[1d20+3]\nDégats : ?[2d8+2]\n![Dextérité,+3][Force,-1]\nurl[https://www.aidedd.org/dnd/monstres.php?vf=garde][Fiche du personnage]',
                 'validate' : 'Valider',
                 'clear' : 'Vider',
                 'dice' : 'Dés',
+                'global_dice' : 'Dés globaux',
+                'dice_bonus' : 'Bonus',
+                'none' : 'Aucun',
                 'save' : 'Sauvegarder',
                 'restore' : 'Restaurer',
                 'decoration' : 'Décoration',
@@ -346,10 +355,13 @@
                 'color' : 'Color',
                 'size' : 'Size (in cm)',
                 'other' : 'Other',
-                'default_desc' : 'AC ? • HP #[10]/10 • Speed ?m\nAttack roll : ?[1d20+3]\nDamages : ?[2d8+2]\nurl[https://www.aidedd.org/dnd/monstres.php?vo=guard][Character sheet]',
+                'default_desc' : 'AC ? • HP #[10]/10 • Speed ?m\nAttack roll : ?[1d20+3]\nDamages : ?[2d8+2]\n![Dexterity,+3][Strength,-1]\nurl[https://www.aidedd.org/dnd/monstres.php?vo=guard][Character sheet]',
                 'validate' : 'Confirm',
                 'clear' : 'Clear',
                 'dice' : 'Dice',
+                'global_dice' : 'Global dice',
+                'dice_bonus' : 'Bonus',
+                'none' : 'None',
                 'save' : 'Save',
                 'restore' : 'Restore',
                 'decoration' : 'Decoration',
@@ -833,6 +845,7 @@
                         character_manager.movement_manager.stop_movement();
                     if (this.is_lighting)
                         this.hide_lighter();
+                    this._update_dice_select();
                     $('#back_settings').css('background-color',  this.is_lighting ? 'black' : 'rgba(0,0,0,0.5)');
                     $('input[name="irl_size"]').val(case_irl_size);
                     $('input[name="pix"]').val(case_pix_size);
@@ -864,11 +877,61 @@
                 throw_dice() {
                     if (!this._semaphore_dice)
                         return;
-                    let dice_type = parseInt($('input[name="dice"]').val());
-                    let result = Math.floor(Math.random() * dice_type) + 1;
+                    let ele = $('input[name="dice"]');
+                    if (ele.is(':invalid') || ele.val() == '')
+                        return;
+                    let result = CharacterManager.throw_dice(ele.val());
                     $('#dice_result').val('⏳');
                     this._semaphore_dice = false;
                     setTimeout(() => {$('#dice_result').val(result);this._semaphore_dice = true;}, 200);
+                }
+
+                throw_multi_dice() {
+                    let input = $('input[name="global_dice"]');
+                    if (input.is(':invalid') || input.val() == '')
+                        return;
+                    let dice = input.val();
+                    let characters = [];
+                    for (const c of character_manager.character_list)
+                        characters.push({
+                            'ref': c,
+                            'result': 0,
+                            'bonus': 0
+                        });
+                    let t_bonus = $('select[name="global_dice_bonus"]').val();
+                    if (t_bonus) {
+                        const re = /\[\s*([^,\]\[]+)\s*,\s*([+-]?\d+)\s*\]/gm;
+                        for (let c of characters) {
+                            for (const desc of c.ref.description) {
+                                let ok = false;
+                                if (desc.type == 'data') {
+                                    const array = [...desc.value[0][0].matchAll(re)];
+                                    for (const match of array)
+                                        if (t_bonus == match[1].toLowerCase()) {
+                                            ok = true;
+                                            c.bonus = parseInt(match[2]);
+                                            break;
+                                        }
+                                    if (ok)
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                    for (let c of characters) {
+                        c.result = CharacterManager.throw_dice(dice) + c.bonus;
+                    }
+                    characters.sort((a,b) => (a.result > b.result) ? -1 : ((b.result > a.result) ? 1 : 0));
+                    let res_table = '';
+                    for (const c of characters)
+                        res_table += '<tr><td>' + c.ref.name + '</td><td>' + c.result + '</td></tr>';
+
+                    $('#global_dice_result').html('<tr><td>⏳</td></tr>');
+                    $('#a_throw_multi_dice').attr('onclick', '');
+                    setTimeout(() => {
+                        $('#global_dice_result').html(res_table);
+                        $('#a_throw_multi_dice').attr('onclick', 'settings_manager.throw_multi_dice()');
+                    }, 200);
                 }
 
                 start_decoration(remove) {
@@ -970,25 +1033,55 @@
                     $('#l_top').css('height', this._y_mouse-0.5*pix_lighter >= 0 ? this._y_mouse-0.5*pix_lighter : 0);
                     $('#l_bottom').css('height', (win_h-this._y_mouse)-0.5*pix_lighter >= 0 ?  (win_h-this._y_mouse)-0.5*pix_lighter : 0);
                 }
+
+                _update_dice_select() {
+                    let bonus_list = [];
+                    for (const c of character_manager.character_list)
+                        for (const desc of c.description)
+                            if (desc.type == 'data') {
+                                const re = /\[\s*([^,\]\[]+)\s*,\s*([+-]?\d+)\s*\]/gm;
+                                const array = [...desc.value[0][0].matchAll(re)];
+                                for (const match of array)
+                                    if (!bonus_list.includes(match[1].toLowerCase()))
+                                        bonus_list.push(match[1].toLowerCase());
+                            }
+                    bonus_list.sort();
+                    $('select[name="global_dice_bonus"]').html('<option selected disabled value>'+tr('none')+'</option>');
+                    for (const bonus of bonus_list) {
+                        $('select[name="global_dice_bonus"]').append('<option value="'+bonus+'">'+bonus.charAt(0).toUpperCase()+bonus.slice(1)+'</option');
+                    }
+                }
             };
 
             class CharacterManager {
 
-                static throw_dice(dice, ele) {
+                static throw_dice(dice) {
                     let res = 0;
                     let blocks = dice.replace(/-/g, '+-').split('+');
                     for (const bl of blocks) {
                         if (!bl.includes('d'))
                             res += parseInt(bl);
                         else {
-                            let times = parseInt(bl.split('d')[0]);
-                            let faces = parseInt(bl.split('d')[1]);
+                            let split = bl.split('d');
+                            let times = split[0] != '' ? parseInt(split[0]) : 1;
+                            let faces = parseInt(split[1]);
                             for (let i=0; i<times; i++)
                                 res += Math.floor(Math.random() * faces) + 1;
                         }
                     }
-                    ele.val(res.toString());
-                    ele.attr('size', Math.max(2, ele.val().length));
+                    return res;  
+                }
+
+                static click_throw_dice(dice, ele) {
+                    let res = CharacterManager.throw_dice(dice);
+                    ele.next().val('⏳');
+                    ele.attr('onclick', '');
+                    setTimeout(() => {
+                        ele.next().val(res.toString());
+                        ele.next().attr('size', Math.max(2, ele.next().val().length));
+                        ele.attr('onclick', 'CharacterManager.click_throw_dice( "'+ele.attr('title')+'", $(this))');
+                    }, 200);
+
                 }
 
                 constructor() {
@@ -1263,9 +1356,21 @@
                             }
                         },
                         'dice' : {
-                            'regex' : /\?\[((?:\d+|\d+d\d+)(?:[+-](?:\d+|\d+d\d+))*)\]/m,
+                            'regex' : /\?\[((?:\d+|\d*d\d+)(?:[+-](?:\d+|\d*d\d+))*)\]/m,
                             'shown': (match, index, ele) => {
-                                return '<span class="character_dice" title="'+match[1]+'" onclick="CharacterManager.throw_dice(\''+match[1]+'\', $(this).next())">🎲</span> <input class="character_dice_input" disabled type="text" size="2" />';
+                                return '<span class="character_dice" title="'+match[1]+'" onclick="CharacterManager.click_throw_dice(\''+match[1]+'\', $(this))">🎲</span> <input class="character_dice_input" disabled type="text" size="2" />';
+                            }
+                        },
+                        'data' : {
+                            'regex' : /!((?:\[\s*[^,\]\[]+\s*,\s*[+-]?\d+\s*\])+)/m,
+                            'shown' : (match, index, ele) => {
+                                const re = /\[\s*([^,\]\[]+)\s*,\s*([+-]?\d+)\s*\]/gm;
+                                let table = '<table class="desc_table">';
+                                const array = [...match[0].matchAll(re)];
+                                for (const match of array)
+                                    table += '<tr><td>' + match[1] + '</td><td>' + match[2] + '</td></tr>';
+                                table += '</table>';
+                                return table;
                             }
                         }
                     };
@@ -1430,20 +1535,26 @@
                     <table>
                         <tr>
                             <td><a class='cancel' onclick='settings_manager.cancel()' tr='true' key_tr='cancel'></a></td><td><a class='validate' onclick='settings_manager.save_state()' tr='true' key_tr='save'></a></td><td><a class='validate' tr='true' key_tr='restore' onclick='settings_manager.load_state()'></a></td>
+                            <td></td>
                             <td><select onchange='settings_manager.change_language()' name='lg'></select></td>
                         </tr>
-                        <tr class='th'><td tr='true' key_tr='clear'></td><td tr='true' key_tr='dice'></td><td tr='true' key_tr='decoration'></td><td tr='true' key_tr='grid'></td></tr>
+                        <tr class='th'><td tr='true' key_tr='clear'></td><td tr='true' key_tr='dice'></td><td tr='true' key_tr='global_dice'></td><td tr='true' key_tr='decoration'></td><td tr='true' key_tr='grid'></td></tr>
                         <tr>
                             <td><a onclick='settings_manager.clear_characters();' class='validate' tr='true' key_tr='characters'></a></td>
-                            <td><input class='settings_input' min='1' type='number' name='dice' value='20'/> <a onclick='settings_manager.throw_dice();' class='validate' tr='true' key_tr='throw'></a></td>
+                            <td><input size='10' pattern="(?:\d+|\d*d\d+)(?:[+-](?:\d+|\d*d\d+))*" type='text' name='dice' value='1d20+0'/> <a onclick='settings_manager.throw_dice();' class='validate' tr='true' key_tr='throw'></a></td>
+                            <td>
+                                <span tr="true" key_tr="global_dice"></span> : <input size='10' pattern="(?:\d+|\d*d\d+)(?:[+-](?:\d+|\d*d\d+))*" type='text' name='global_dice' value='1d20+0'/><br/>
+                                <span tr="true" key_tr="dice_bonus"></span> : <select name='global_dice_bonus' name='dice_bonus'><option tr='true' key_tr='none' disabled selected value></option></select><br/><a id='a_throw_multi_dice' onclick='settings_manager.throw_multi_dice();' class='validate' tr='true' key_tr='throw'></a> • <span style='cursor:pointer', onclick='$("#global_dice_result").html("");'>🗑</span>
+                            </td>
                             <td><input type='color' name='color_decoration' /> <a onclick='settings_manager.start_decoration(false);' class='validate' tr='true' key_tr='decorate'></a></td>
-                            <td><span tr='true' key_tr='dimension'></span> <input type='number' min='1' name='dim' class='settings_input' /> • <span tr='true' key_tr='pix_size'></span> <input type='number' min='1' name='pix' class='settings_input' /></td>
+                            <td><span tr='true' key_tr='dimension'></span> : <input type='number' min='1' name='dim' class='settings_input' /><br/><span tr='true' key_tr='pix_size'></span> : <input type='number' min='1' name='pix' class='settings_input' /><br/><span tr='true' key_tr='irl_size'></span> : <input type='number' min='1' name='irl_size' class='settings_input' /></td>
                         </tr>
                         <tr>
                             <td><a onclick='settings_manager.clear_decoration();' class='validate' tr='true' key_tr='decorations'></a></td>
                             <td>🎲 : <input class='settings_input' type='text' disabled id='dice_result'/></td>
+                            <td><table id='global_dice_result'></table></td>
                             <td><span onclick='settings_manager.start_decoration(true);' style="cursor:pointer">🗑</span> • <span onclick='settings_manager.start_lighting();' style="cursor:pointer">💡</span></td>
-                            <td><span tr='true' key_tr='irl_size'></span> <input type='number' min='1' name='irl_size' class='settings_input' /> <a onclick='settings_manager.update_grid();' class='validate' tr='true' key_tr='validate'>Valider</a></td>
+                            <td><a onclick='settings_manager.update_grid();' class='validate' tr='true' key_tr='validate'>Valider</a></td>
                         </tr>
                     </table>
                 </form>
