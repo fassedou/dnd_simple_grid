@@ -141,9 +141,9 @@
                 left:0;
                 background-color: black;
                 display:none;
-                width : 200px;
+                width : 300px;
                 padding-bottom : 10px;
-                max-height : 200px;
+                max-height : 300px;
                 overflow: scroll;
                 z-index : 12;
             }
@@ -325,7 +325,7 @@
                 'color' : 'Couleur',
                 'size' : 'Taille (en cm)',
                 'other' : 'Autre',
-                'default_desc' : 'CA ? • PV #[10]/10 • Vit ?m \n Jet d\'attaque : ?[1d20+3]\nDégats : ?[2d8+2]\n![Dextérité,+3][Force,-1]\nurl[https://www.aidedd.org/dnd/monstres.php?vf=garde][Fiche du personnage]',
+                'default_desc' : '[[]]\nCA ? • PV #[10]/10 • Vit ?m \n Jet d\'attaque : ?[1d20+3]\nDégats : ?[2d8+2]\n![Dextérité,+3][Force,-1]\nurl[https://www.aidedd.org/dnd/monstres.php?vf=garde][Fiche du personnage]',
                 'validate' : 'Valider',
                 'clear' : 'Vider',
                 'simple_dice' : 'Sur la grille,<br/>appuyez sur "Entrer"<br/>pour faire rapidement ce lancé.',
@@ -345,7 +345,8 @@
                 'decorations' : 'Décorations',
                 'irl_size' : 'Taille case (en cm)',
                 'error' : 'Une erreur s\'est produite : ',
-                'light_info' : 'Appuyez sur + ou - pour augmenter/diminuer la taille. Appuez sur Échap pour revenir à la normale.'
+                'light_info' : 'Appuyez sur + ou - pour augmenter/diminuer la taille. Appuez sur Échap pour revenir à la normale.',
+                'note' : 'Note'
             };
 
             let english = {
@@ -371,7 +372,7 @@
                 'color' : 'Color',
                 'size' : 'Size (in cm)',
                 'other' : 'Other',
-                'default_desc' : 'AC ? • HP #[10]/10 • Speed ?m\nAttack roll : ?[1d20+3]\nDamages : ?[2d8+2]\n![Dexterity,+3][Strength,-1]\nurl[https://www.aidedd.org/dnd/monstres.php?vo=guard][Character sheet]',
+                'default_desc' : '[[]]\nAC ? • HP #[10]/10 • Speed ?m\nAttack roll : ?[1d20+3]\nDamages : ?[2d8+2]\n![Dexterity,+3][Strength,-1]\nurl[https://www.aidedd.org/dnd/monstres.php?vo=guard][Character sheet]',
                 'validate' : 'Confirm',
                 'clear' : 'Clear',
                 'simple_dice' : 'On the grid, press "Enter"<br/>to quickly do this throw.',
@@ -391,7 +392,8 @@
                 'decorations' : 'Decorations',
                 'irl_size' : 'Case size (in cm)',
                 'error' : 'An error occured : ',
-                'light_info' : 'Press + or - to increase/decrease the size. Press Escape to return to normal.'
+                'light_info' : 'Press + or - to increase/decrease the size. Press Escape to return to normal.',
+                'note' : 'Note'
             };
 
             let translations = {'English' : english, 'Français' : french};
@@ -405,20 +407,30 @@
                 load_json(str_data) {
                     try {
                         let data = JSON.parse(str_data);
-                        grid_manager.decoration.clear_decoration();
-                        character_manager.clear_characters();
-                        case_irl_size = data['irl'];
-                        case_pix_size = data['pix'];
-                        Character.set_character_id(data['cid']);
-                        grid_dimension = data['dim'];
-                        CharacterGenerator.set_generator_id(data['gid']);
-                        character_manager.generic_character_list_from_string(data['sgc']);
-                        character_manager.default_character_list_from_string(data['sdc']);
-                        character_manager.character_list_from_string(data['cha']);
-                        grid_manager.decoration.decorations_from_string(data['dec']);
-                        lg = data['lg'];
-                        size_lighter = data['sl'];
-                        settings_manager.is_lighting = data['lon'];
+                        if ('dec' in data)
+                            grid_manager.decoration.clear_decoration();
+                        if ('cha' in data)
+                            character_manager.clear_characters();
+                        if ('irl' in data)
+                            case_irl_size = data['irl'];
+                        if ('pix' in data)
+                            case_pix_size = data['pix'];
+                        if ('dim' in data)
+                            grid_dimension = data['dim'];
+                        if ('sgc' in data)
+                            character_manager.generic_character_list_from_string(data['sgc']);
+                        if ('sdc' in data)
+                            character_manager.default_character_list_from_string(data['sdc']);
+                        if ('cha' in data)
+                            character_manager.character_list_from_string(data['cha']);
+                        if ('dec' in data)
+                            grid_manager.decoration.decorations_from_string(data['dec']);
+                        if ('lg' in data)
+                            lg = data['lg'];
+                        if ('sl' in data)
+                            size_lighter = data['sl'];
+                        if ('lon' in data)
+                            settings_manager.is_lighting = data['lon'];
                         $('#back_settings').css('background-color',  settings_manager.is_lighting ? 'black' : 'rgba(0,0,0,0.5)');
                         return true;
                     } catch(err) {
@@ -431,9 +443,7 @@
                     var data = {};
                     data['irl'] = case_irl_size;
                     data['pix'] = case_pix_size;
-                    data['cid'] = Character.get_character_id();
                     data['dim'] = grid_dimension;
-                    data['gid'] = CharacterGenerator.get_generator_id();
                     data['cha'] = character_manager.serialize(0);
                     data['sdc'] = character_manager.serialize(1);
                     data['sgc'] = character_manager.serialize(2);
@@ -447,10 +457,6 @@
 
             let _character_id = 0;
             class Character {
-
-                static get_character_id() {
-                    return _character_id;
-                }
                 
                 static inc_character_id() {
                     return _character_id++;
@@ -460,7 +466,7 @@
                     _character_id = id;
                 }
 
-                constructor(name, initials, color, size, description, row, col, grid_case, id=-1) {
+                constructor(name, initials, color, size, description, row, col, grid_case) {
                     this.name = name;
                     this.color = color;
                     this.size = size;
@@ -470,16 +476,16 @@
                     this.grid_case = grid_case;
                     this.character_div = null;
                     this.size_div = null;
-                    this.id = id>=0 ? id : Character.inc_character_id();
+                    this.id = Character.inc_character_id();
                     this.initials = initials ? initials : this.id.toString();
                 }
 
                 serialize() {
-                    return {'nam':this.name, 'ini': this.initials, 'clr':this.color, 'siz':this.size, 'des':this.description_to_string(), 'row' : this.row, 'col' : this.col, 'id': this.id};
+                    return {'nam':this.name, 'ini': this.initials, 'clr':this.color, 'siz':this.size, 'des':this.description_to_string(), 'row' : this.row, 'col' : this.col};
                 }
 
                 static from_string(map) {
-                    return new Character(map['nam'], map['ini'], map['clr'], map['siz'], map['des'], map['row'], map['col'], null, map['id']);
+                    return new Character(map['nam'], map['ini'], map['clr'], map['siz'], map['des'], map['row'], map['col'], null);
                 }
 
                 create() {
@@ -586,29 +592,27 @@
                     this.description[index].value = [['#['+val+']', val], index, this];
                 }
 
+                note_changed(textarea) {
+                    let val = textarea.val()
+                    let index = parseInt(textarea.attr('desc_index'));
+                    this.description[index].value = [['[['+val+']]', val], index, this];
+                }
+
             };
 
             let _generator_id = 0;
             class CharacterGenerator {
-
-                static get_generator_id() {
-                    return _generator_id;
-                }
                 
                 static inc_generator_id() {
                     return _generator_id++;
                 }
 
-                static set_generator_id(id) {
-                    _generator_id = id;
-                }
-
-                constructor(name, color, size, description, id=-1) {
+                constructor(name, color, size, description) {
                     this.name = name;
                     this.color = color;
                     this.size = size;
                     this.description = description;
-                    this.id = id >= 0 ? id : CharacterGenerator.inc_generator_id();
+                    this.id = CharacterGenerator.inc_generator_id();
                 }
 
                 create_character(row, col, grid_case) {
@@ -618,11 +622,11 @@
                 }
 
                 serialize() {
-                    return {'nam':this.name, 'clr':this.color, 'siz':this.size, 'des':this.description, 'id': this.id};
+                    return {'nam':this.name, 'clr':this.color, 'siz':this.size, 'des':this.description};
                 }
 
                 static from_string(map) {
-                    return new CharacterGenerator(map['nam'], map['clr'], map['siz'], map['des'], map['id']);
+                    return new CharacterGenerator(map['nam'], map['clr'], map['siz'], map['des']);
                 }
             }
 
@@ -1125,13 +1129,11 @@
                 }
 
                 default_character_list_from_string(data) {
-                    this._default_character_list = [];
                     for (const character of data)
                         this._default_character_list.push(Character.from_string(character));
                 }
 
                 generic_character_list_from_string(data) {
-                    this._generic_character_list = [];
                     for (const character of data)
                         this._generic_character_list.push(CharacterGenerator.from_string(character));
                 }
@@ -1256,7 +1258,7 @@
                 save_character_as_generic(id) {
                     for (const character of this.character_list)
                         if (character.id == id) {
-                            this._generic_character_list.push(new CharacterGenerator(character.name, character.color, character.size, character.description));
+                            this._generic_character_list.push(new CharacterGenerator(character.name, character.color, character.size, character.description_to_string()));
                             break;
                         }
                     this.cancel();   
@@ -1364,6 +1366,12 @@
                             return character.change_number_description(input);
                 }
 
+                note_changed(id, textarea) {
+                    for (let character of this.character_list)
+                        if (character.id == id)
+                            return character.note_changed(textarea);
+                }
+
                 _create_regex_description() {
                     return {
                         'url' : {
@@ -1394,6 +1402,12 @@
                                     table += '<tr><td>' + match[1] + '</td><td>' + match[2] + '</td></tr>';
                                 table += '</table>';
                                 return table;
+                            }
+                        },
+                        'note' : {
+                            'regex' : /\[\[([^\]]*)\]\]/m,
+                            'shown' : (match, index, ele) => {
+                                return '<textarea style="resize:vertical" desc_index="'+index+'" onchange="character_manager.note_changed('+ele.id+', $(this))" placeholder="' + tr('note') + '">'+match[1]+'</textarea>' 
                             }
                         }
                     };
@@ -1487,9 +1501,17 @@
                 simple_dice_throw() {
                     if (settings_manager.window_open || character_manager.window_open || grid_manager.decoration.is_decorating || character_manager.movement_manager.is_moving)
                         return;
+                    let ok = true;
+                    $('.description').each(function() {
+                        if ($(this).css('display') == 'block')
+                            if ($('textarea', this).is(':focus'))
+                                ok = false;
+                    });
+                    if (!ok)
+                        return;
                     let dice = $('input[name="dice"]').val();
                     if (dice == '')
-                        return;
+                        dice = '1d20+0';
                     let res = CharacterManager.throw_dice(dice);
                     let ele = $('#simple_dice_result');
                     ele.html(res.toString()+'<br/><span>🎲 : '+dice+'</span>');
